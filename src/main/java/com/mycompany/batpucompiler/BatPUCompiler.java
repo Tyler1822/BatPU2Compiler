@@ -41,6 +41,11 @@ enum TokenType {
     TOK_LBRACE, // {
     TOK_RBRACE, // }
     TOK_SEMI, // ;
+    
+    
+    // Output keywords
+    TOK_VAROUT // VarOut(ident)
+    
 }
 
 enum ParseType {
@@ -56,6 +61,9 @@ enum ParseType {
     WHILE, // while var
     HALT, // halt;
     RETURN, // return var;
+    // Output Satatements
+    VAROUT, // VarOut(Ident);
+    
     
     // Expressions
     BINARY, // a + 1, a - 1
@@ -155,7 +163,7 @@ class Token {
 
 public class BatPUCompiler {
     
-    public static final String program = 
+    /*public static final String program = 
             """
             func main {
                 var a;
@@ -168,10 +176,29 @@ public class BatPUCompiler {
                 }
                 halt;
             }
+            """;*/
+    public static final String program =
+            """
+            func main {
+                var a;
+                var b;
+                var c;
+                var n;
+            
+                a = 1;
+                b = 1;
+                n = 10;
+            
+                while n {
+                    c = a + b;
+                    a = b;
+                    b = c;
+                    n = n - 1;
+                    VarOut(c);
+                }
+                halt;
+            }
             """;
-    
-    
-    
     
     static Token token;
     
@@ -328,6 +355,7 @@ public class BatPUCompiler {
         if(word.equals("if")) return TokenType.TOK_IF;
         if(word.equals("return")) return TokenType.TOK_RETURN;
         if(word.equals("halt")) return TokenType.TOK_HALT;
+        if(word.equals("VarOut")) return TokenType.TOK_VAROUT;
         return TokenType.TOK_IDENT;
     }
     
@@ -388,10 +416,25 @@ public class BatPUCompiler {
         if(token.type == TokenType.TOK_WHILE) return parse_while();
         if(token.type == TokenType.TOK_HALT) return parse_halt();
         if(token.type == TokenType.TOK_IDENT) return parse_assignment();
+        if(token.type == TokenType.TOK_VAROUT) return parse_varout();
         
         System.out.println("Unknown statement. Token: " + token.type.name());
         System.exit(-1);
         return null;
+    }
+    
+    static ParseNode parse_varout() {
+        expect(TokenType.TOK_LPAREN);
+        expect(TokenType.TOK_IDENT);
+        // do something
+        ParseNode varOutNode = new ParseNode(ParseType.VAROUT);
+        ParseNode ident = new ParseNode(ParseType.IDENTIFIER);
+        ident.name = token.text;
+        varOutNode.add_child(ident);
+        expect(TokenType.TOK_RPAREN);
+        expect(TokenType.TOK_SEMI);
+        next_token(); // consume ;
+        return varOutNode;
     }
     
     static ParseNode parse_var_decl() {
@@ -467,11 +510,9 @@ public class BatPUCompiler {
     static ParseNode parse_additive() {
         ParseNode left = parse_primary();
         
-        //next_token(); // consume left
-        
         while(token.type == TokenType.TOK_PLUS || token.type == TokenType.TOK_MINUS) {
-            next_token();
             String op = token.text; // operator
+            next_token();
             
             ParseNode right = parse_primary();
             
@@ -540,10 +581,27 @@ public class BatPUCompiler {
             case IF -> compileIf(node);
             case WHILE -> compileWhile(node);
             case HALT -> emit(new ASMInst(InstType.HLT));
+            case VAROUT -> compileVarOut(node);
             //case RETURN -> compileReturn(node); TODO: impliment functions correctly in parse tree and in ASM
 
             default -> throw new RuntimeException("Invalid statement node: " + node.type);
         }
+    }
+    
+    static void compileVarOut(ParseNode node) {
+        /*
+        ASM:
+        LDI r4 varPtr
+        LOD r4 r4
+        LDI rTemp 250
+        STR rTemp r4
+        */
+        
+        emit(ASMInst.regImm(InstType.LDI, 4, getVar(node.children.get(0).name)));
+        emit(ASMInst.reg3(InstType.LOD, 4, 4, 0));
+        int rTemp = allocTemp();
+        emit(ASMInst.regImm(InstType.LDI, rTemp, 250));
+        emit(ASMInst.reg3(InstType.STR, rTemp, 4, 0));
     }
     
     static void compileProgram(ParseNode node) {
@@ -603,7 +661,7 @@ public class BatPUCompiler {
         ASM Pattern:
         
 loop:   LDI r4, addr(condition)
-        LOD r1, r4
+        LOD r4, r1
         SUB r1, r0, r0  (set flags based on condition) PSEUDO: CMD r1 r0 r0
         BRH EQ loop_end  (if condition == 0 skip body)
         
@@ -617,7 +675,7 @@ loop_end:
         
         int condReg = allocTemp();
         emit(ASMInst.regImm(InstType.LDI, 4, addr));
-        emit(ASMInst.reg3(InstType.LOD, 1, 4, 0));
+        emit(ASMInst.reg3(InstType.LOD, 4, 1, 0));
         
         emit(ASMInst.reg3(InstType.SUB, condReg, 0, 0));
         
@@ -692,7 +750,7 @@ loop_end:
         
         
         emit(ASMInst.regImm(InstType.LDI, 4, addr)); // r4 <- address
-        emit(ASMInst.reg3(InstType.LOD, r, 4, 0)); // r = memory[r4]
+        emit(ASMInst.reg3(InstType.LOD, 4, r, 0)); // r = memory[r4]
         
         return r;
     }
@@ -706,7 +764,7 @@ loop_end:
     static int compileBinary(ParseNode n) {
         // evaluate operands
         int left = compileExpr(n.children.get(0));
-        int right = compileExpr(n.children.get(0));
+        int right = compileExpr(n.children.get(1));
         
         int dst = allocTemp();
         
@@ -735,7 +793,7 @@ loop_end:
         return dst;
     }
     
-    static int[] temps = {1, 2, 3, 4, 5};
+    static int[] temps = {1, 2, 3, 5};
     static boolean[] used;
 
     static int allocTemp() {
@@ -756,6 +814,7 @@ loop_end:
         for(int i = 0; i < MemAllocation.length; i++) {
             if(MemAllocation[i] == null) {
                 MemAllocation[i] = name;
+                System.out.println("Mapped var " + name + " to addr: " + i);
                 return i;
             }
         }
@@ -784,7 +843,6 @@ loop_end:
     static void emit(ASMInst inst) {
         inst.pc = instructions.size();
         instructions.add(inst);
-        
     }
     
     public static void main(String[] args) {
@@ -799,7 +857,7 @@ loop_end:
         ParseNode parsed = parse_program();
         
         used = new boolean[16];
-        MemAllocation = new String[256]; // our system has 256 bytes of memory (note addresses 240-255 are reserved for I/O)
+        MemAllocation = new String[241]; // our system has 256 bytes of memory (note addresses 240-255 are reserved for I/O)
         instructions = new ArrayList<>();
         
         System.out.print(parsed);
