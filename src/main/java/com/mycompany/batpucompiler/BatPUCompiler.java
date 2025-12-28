@@ -177,18 +177,18 @@ public class BatPUCompiler {
                 halt;
             }
             """;*/
-    public static final String program =
+    /*public static final String program =
             """
             func main {
                 var a;
                 var b;
                 var c;
                 var n;
-            
+
                 a = 1;
                 b = 1;
                 n = 10;
-            
+
                 while n {
                     c = a + b;
                     a = b;
@@ -196,6 +196,32 @@ public class BatPUCompiler {
                     n = n - 1;
                     VarOut(c);
                 }
+                halt;
+            }
+            """;*/
+    /*public static final String program = 
+            """
+            func main {
+                var a;
+                var b;
+                a = 1;
+                b = 50;
+                c = add(a, b);
+                VarOut(c);
+                c = add(1, 10);
+                VarOut(c);
+                c = add(a + 1, 7);
+                VarOut(c);
+            }
+            func add(a, b) {
+                return a + b;
+            }
+            """;*/
+    public static final String program =
+            """
+            func main {
+                var or = 1;
+                VarOut(or);
                 halt;
             }
             """;
@@ -444,7 +470,17 @@ public class BatPUCompiler {
         ParseNode decl = new ParseNode(ParseType.VAR_DECL);
         decl.name = varIdent;
         
-        expect(TokenType.TOK_SEMI);
+        //expect(TokenType.TOK_SEMI);
+        next_token();
+        // check if variable is being assigned or just declared
+        if(token.type == TokenType.TOK_ASSIGN) {
+            ParseNode assign = new ParseNode(ParseType.VAR_ASSIGN);
+            assign.name = varIdent;
+            next_token(); // consume = 
+            assign.add_child(parse_expression());
+            decl.add_child(assign);
+        } 
+        
         // consume ;
         next_token();
         return decl;
@@ -488,6 +524,7 @@ public class BatPUCompiler {
         
         ParseNode assign = new ParseNode(ParseType.VAR_ASSIGN);
         assign.name = name;
+        
         next_token(); // consume =
         assign.add_child(parse_expression());
         
@@ -510,7 +547,12 @@ public class BatPUCompiler {
     static ParseNode parse_additive() {
         ParseNode left = parse_primary();
         
-        while(token.type == TokenType.TOK_PLUS || token.type == TokenType.TOK_MINUS) {
+        while(token.type == TokenType.TOK_PLUS 
+                || token.type == TokenType.TOK_MINUS 
+                || token.type == TokenType.TOK_AND 
+                || token.type == TokenType.TOK_OR 
+                || token.type == TokenType.TOK_XOR
+                || token.type == TokenType.TOK_RSHIFT) {
             String op = token.text; // operator
             next_token();
             
@@ -543,7 +585,7 @@ public class BatPUCompiler {
             next_token();
             return n;
         }
-        
+        // Parrenthases in PEMDAS
         if(token.type == TokenType.TOK_LPAREN) {
             next_token();
             ParseNode e = parse_expression();
@@ -602,6 +644,7 @@ public class BatPUCompiler {
         int rTemp = allocTemp();
         emit(ASMInst.regImm(InstType.LDI, rTemp, 250));
         emit(ASMInst.reg3(InstType.STR, rTemp, 4, 0));
+        freeTemp(rTemp);
     }
     
     static void compileProgram(ParseNode node) {
@@ -694,6 +737,9 @@ loop_end:
     
     static void compileVarDecl(ParseNode node) {
         allocateMem(node.name);
+        if(node.children.size() == 1) {
+            compileVarAssign(node.children.get(0));
+        }
     }
     
     static void compileVarAssign(ParseNode n) {
@@ -782,8 +828,23 @@ loop_end:
             case "-" -> InstType.SUB;
             case "&" -> InstType.AND;
             case "^" -> InstType.XOR; //TODO: IMPLIMENT | AND >>
+            case "|" -> null; // to be implimented using AND + XOR
+            case ">>" -> InstType.RSH;
             default -> throw new RuntimeException("Unknown operator");
         };
+        
+        if(op == null) {
+            // (left XOR right) XOR (left AND right)
+            emit(ASMInst.reg3(InstType.XOR, left, right, dst));
+            int temp = allocTemp();
+            emit(ASMInst.reg3(InstType.AND, left, right, temp));
+            emit(ASMInst.reg3(InstType.XOR, dst, temp, dst));
+            
+            freeTemp(left);
+            freeTemp(right);
+            freeTemp(temp);
+            return dst;
+        }
         
         emit(ASMInst.reg3(op, left, right, dst));
         
@@ -857,7 +918,7 @@ loop_end:
         ParseNode parsed = parse_program();
         
         used = new boolean[16];
-        MemAllocation = new String[241]; // our system has 256 bytes of memory (note addresses 240-255 are reserved for I/O)
+        MemAllocation = new String[240]; // our system has 256 bytes of memory (note addresses 240-255 are reserved for I/O)
         instructions = new ArrayList<>();
         
         System.out.print(parsed);
