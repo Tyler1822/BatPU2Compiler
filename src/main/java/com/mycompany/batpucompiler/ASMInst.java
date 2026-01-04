@@ -4,8 +4,6 @@
  */
 package com.mycompany.batpucompiler;
 
-import java.util.logging.Logger;
-
 /**
  *
  * @author tyler
@@ -26,6 +24,8 @@ public class ASMInst {
     int addr = -1; // jump or branch address destiation
     
     int pc; // instruction idx
+    
+    String label; // used for functions
     
     public ASMInst(InstType type) {
         this.type = type;
@@ -72,7 +72,12 @@ public class ASMInst {
         if (ra != -1 || rb != -1 || rd != -1) {
             if (ra != -1) sb.append(" r").append(ra);
             if (rb != -1) sb.append(" r").append(rb);
-            if (rd != -1) sb.append(" r").append(rd);
+            if(this.type != InstType.STR) { // 3rd opperand of STR is a 4 bit signed literal
+                if (rd != -1) sb.append(" r").append(rd);
+            } else {
+                sb.append(" ").append(rd);
+            }
+            
         }
 
         // immediate
