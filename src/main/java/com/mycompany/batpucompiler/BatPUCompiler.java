@@ -17,221 +17,9 @@ import java.util.logging.Logger;
  * @author tyler
  */
 
-enum TokenType {
-    TOK_EOF,
-    TOK_INVALID,
-    
-    TOK_IDENT,
-    TOK_NUMBER, // chars are also converted to numbers a=1, b=2, c=3...
-
-    // keywords
-    TOK_FUNC,
-    TOK_VAR,
-    TOK_ARR,
-    TOK_WHILE,
-    TOK_IF,
-    TOK_RETURN,
-    TOK_HALT,
-
-    // operators
-    TOK_ASSIGN, // =
-    TOK_PLUS, // +
-    TOK_MINUS, // -
-    TOK_AND, // &
-    TOK_OR, // |
-    TOK_XOR, // ^
-    TOK_RSHIFT, // >>
-    
-
-    // punctuation
-    TOK_LPAREN, // (
-    TOK_RPAREN, // )
-    TOK_LBRACE, // {
-    TOK_RBRACE, // }
-    TOK_SEMI, // ;
-    TOK_COMMA, // ,
-    TOK_RBRACK, // ]
-    TOK_LBRACK, // [
-    TOK_STAR, // *
-    
-    
-    // Output keywords
-    TOK_VAROUT, // VarOut(ident)
-    TOK_STRMEM, // StrMem(literal (addr), var (value))
-    TOK_LODMEM // LodMem(expression (addr), output (var))    output <- Memmory[addr]
-}
-
-enum ParseType {
-    // Top level
-    PROGRAM,
-    FUNCTION,
-    BLOCK,
-    
-    // Statements
-    VAR_DECL, // var a;
-    ARR_DECL, // arr b[5];
-    VAR_ASSIGN, // a = expr;
-    ARR_ASSIGN, // b[0] = expr;
-    IF, // if var block
-    WHILE, // while var
-    HALT, // halt;
-    RETURN, // return var;
-    // Output Satatements
-    VAROUT, // VarOut(Ident);
-    STRMEM,
-    LODMEM,
-    
-    
-    // Expressions
-    BINARY, // a + 1, a - 1
-    LITERAL, // nubmer literals
-    IDENTIFIER, // a
-    DEREF_IDENT // *ptr
-}
-
-class ParseNode {
-    ParseType type;
-    ArrayList<ParseNode> children;
-    int value; // for number literals
-    String name; // for identifiers
-    
-    public ParseNode(ParseType type) {
-        this.type = type;
-        children = new ArrayList<>();
-    }
-    
-    public ParseNode(ParseType type, ArrayList<ParseNode> children) {
-        this.type = type;
-        this.children = children;
-    }
-
-    public ParseNode(ParseType type, ArrayList<ParseNode> children, int value, String name) {
-        this.type = type;
-        this.children = children;
-        this.value = value;
-        this.name = name;
-    }
-    
-    public void add_child(ParseNode child) {
-        children.add(child);
-    }
-    
-    @Override
-    public String toString() {
-        StringBuilder sb = new StringBuilder();
-        buildString(sb, 0);
-        return sb.toString();
-    }
-
-    private void buildString(StringBuilder sb, int depth) {
-        // indent
-        for (int i = 0; i < depth; i++) {
-            sb.append("  ");
-        }
-
-        // node info
-        sb.append(type.name());
-
-        if (name != null) {
-            sb.append(" (").append(name).append(")");
-        }
-
-        if (type == ParseType.LITERAL) {
-            sb.append(" = ").append(value);
-        }
-        
-        if(type == ParseType.ARR_ASSIGN) {
-            sb.append(" " + value);
-        }
-        
-        sb.append("\n");
-
-        // recurse
-        for (ParseNode child : children) {
-            child.buildString(sb, depth + 1);
-        }
-    }
-}
-
-class Token {
-    TokenType type;
-    int value; // for numbers
-    String text; // for idents
-    int line; // for debuging
-
-    public Token(TokenType type, int value, String text) {
-        this.type = type;
-        this.value = value;
-        this.text = text;
-    }
-    
-    public Token() {}
-    
-    @Override
-    public String toString() {
-        if(type == TokenType.TOK_IDENT) {
-            return "TOK_IDENT(" + text + ")";
-        }
-        if(type == TokenType.TOK_NUMBER) {
-            return "TOK_NUMBER(" + value + ")";
-        }
-        
-        return type.name();
-    }
-    
-}
-
 public class BatPUCompiler {
     
-    /*public static final String program = 
-            """
-            func main {
-                var a;
-                a = 10;
-                if a {
-                    a = a + 1;
-                }
-                while a {
-                    a = a - 1;
-                }
-                halt;
-            }
-            """;*/
-    /*public static String program = """
-                                   func main {
-                                   	var a = 1;
-                                   	var b = 2;
-                                   	var c = a + b;
-                                   	VarOut(c);
-                                   }
-                                   """;*/
-    /*public static String program = // this is a basic fibonacci program
-            """
-            func main {
-                var a = 1;
-                var b = 1;
-                var c;
-                var n = 10;
-            
-                while n {
-                    c = a + b;
-                    a = b;
-                    b = c;
-                    n = n - 1;
-                    VarOut(c);
-                }
-                halt;
-            }
-            """;*/
-    /*
-    POINTERS AND ARRAYS PLAN EXPLAINED:
-    
-    Arrays are just a bunch of variables side by side in memory.
-    
-    text is a pointer to 'h'
-    
-    we make a copy of the text called ptr (we could increment text instead of making a whole new variable, but we'd lose the initial value of the position of the array)
-    */
+    // EXAMPLE PROGRAMS
     
     public static String program = // hello world using char arrays
             """
@@ -265,6 +53,55 @@ public class BatPUCompiler {
                 halt; 
             }
             """;
+    // graphics memory addresses test
+    /*public static String program = 
+            """
+            func main {
+                var x = 32; # holds the value that the 'turtle' x is on
+                var y = 32;
+                var on = 1;
+                
+                while x {
+                    StrMem(x, 240);
+                    while y {
+                        on = on ^ 1; # this is NOT "on to the power of 1" it is on XOR 1
+                        StrMem(y, 241);
+                        StrMem(0, 243);
+                        
+                        if on {
+                            StrMem(0, 242);
+                        }
+                        
+                        y = y - 1;
+                    }
+                    y = 32;
+                    x = x - 1;
+                    on = on ^ 1;
+                }
+                StrMem(0, 245);
+                halt;
+            }
+            """;*/
+    
+    /*public static String program = // this is a basic fibonacci program
+            """
+            func main {
+                var a = 1;
+                var b = 1;
+                var c;
+                var n = 10;
+            
+                while n {
+                    c = a + b;
+                    a = b;
+                    b = c;
+                    n = n - 1;
+                    VarOut(c);
+                }
+                halt;
+            }
+            """;*/
+    
     /*public static String program = // a much simpler hello world
             """
             func main {
@@ -285,34 +122,7 @@ public class BatPUCompiler {
                 halt;
             }
             """;*/
-    
-    /*public static final String program = 
-            """
-            func main {
-                var a;
-                var b;
-                a = 1;
-                b = 50;
-                c = add(a, b);
-                VarOut(c);
-                c = add(1, 10);
-                VarOut(c);
-                c = add(a + 1, 7);
-                VarOut(c);
-            }
-            func add(a, b) {
-                return a + b;
-            }
-            """;*/
-    /*public static final String program =
-            """
-            func main {
-                var or = 1;
-                VarOut(or);
-                halt;
-            }
-            """;*/
-    
+
     static Token token;
     
     static int pidx = 0;
@@ -327,12 +137,32 @@ public class BatPUCompiler {
         }
         
         
-        // skip whitespace
-        while(Character.isWhitespace(currentChar)) {
-            if(currentChar == '\n') { // update the current line being read
-                token.line += 1;
+        // skip whitespace and comments
+        while (true) {
+
+            // ---- whitespace ----
+            while (Character.isWhitespace(currentChar)) {
+                if (currentChar == '\n') {
+                    token.line += 1;
+                }
+                incChar();
             }
-            incChar();
+
+            // comment
+            if (currentChar == '#') {
+                // consume #
+                incChar();
+
+                // skip until end of line or EOF
+                while (currentChar != '\n' && currentChar != '\0') {
+                    incChar();
+                }
+
+                // newline will be handled by whitespace loop
+                continue;
+            }
+
+            break;
         }
         // identifiers and keywords
         if (isLetter(currentChar)) {
@@ -940,7 +770,7 @@ public class BatPUCompiler {
         
         int condReg = allocTemp();
         emit(ASMInst.regImm(InstType.LDI, 4, addr));
-        emit(ASMInst.reg3(InstType.LOD, condReg, 4, 0));
+        emit(ASMInst.reg3(InstType.LOD, 4, condReg, 0));
         
         // CMP CondReg 0
         emit(ASMInst.reg3(InstType.SUB, condReg, 0, 0));
@@ -1239,6 +1069,172 @@ loop_end:
     public static void loadProgramFile(String filePath) throws IOException {
         byte[] bytes = Files.readAllBytes(Paths.get(filePath));
         program = new String(bytes, StandardCharsets.UTF_8);
+    }
+    
+}
+
+enum TokenType {
+    TOK_EOF,
+    TOK_INVALID,
+    
+    TOK_IDENT,
+    TOK_NUMBER, // chars are also converted to numbers a=1, b=2, c=3...
+
+    // keywords
+    TOK_FUNC,
+    TOK_VAR,
+    TOK_ARR,
+    TOK_WHILE,
+    TOK_IF,
+    TOK_RETURN,
+    TOK_HALT,
+
+    // operators
+    TOK_ASSIGN, // =
+    TOK_PLUS, // +
+    TOK_MINUS, // -
+    TOK_AND, // &
+    TOK_OR, // |
+    TOK_XOR, // ^
+    TOK_RSHIFT, // >>
+    
+
+    // punctuation
+    TOK_LPAREN, // (
+    TOK_RPAREN, // )
+    TOK_LBRACE, // {
+    TOK_RBRACE, // }
+    TOK_SEMI, // ;
+    TOK_COMMA, // ,
+    TOK_RBRACK, // ]
+    TOK_LBRACK, // [
+    TOK_STAR, // *
+    
+    
+    // Output keywords
+    TOK_VAROUT, // VarOut(ident)
+    TOK_STRMEM, // StrMem(literal (addr), var (value))
+    TOK_LODMEM // LodMem(expression (addr), output (var))    output <- Memmory[addr]
+}
+
+enum ParseType {
+    // Top level
+    PROGRAM,
+    FUNCTION,
+    BLOCK,
+    
+    // Statements
+    VAR_DECL, // var a;
+    ARR_DECL, // arr b[5];
+    VAR_ASSIGN, // a = expr;
+    ARR_ASSIGN, // b[0] = expr;
+    IF, // if var block
+    WHILE, // while var
+    HALT, // halt;
+    RETURN, // return var;
+    // Output Satatements
+    VAROUT, // VarOut(Ident);
+    STRMEM,
+    LODMEM,
+    
+    
+    // Expressions
+    BINARY, // a + 1, a - 1
+    LITERAL, // nubmer literals
+    IDENTIFIER, // a
+    DEREF_IDENT // *ptr
+}
+
+class ParseNode {
+    ParseType type;
+    ArrayList<ParseNode> children;
+    int value; // for number literals
+    String name; // for identifiers
+    
+    public ParseNode(ParseType type) {
+        this.type = type;
+        children = new ArrayList<>();
+    }
+    
+    public ParseNode(ParseType type, ArrayList<ParseNode> children) {
+        this.type = type;
+        this.children = children;
+    }
+
+    public ParseNode(ParseType type, ArrayList<ParseNode> children, int value, String name) {
+        this.type = type;
+        this.children = children;
+        this.value = value;
+        this.name = name;
+    }
+    
+    public void add_child(ParseNode child) {
+        children.add(child);
+    }
+    
+    @Override
+    public String toString() {
+        StringBuilder sb = new StringBuilder();
+        buildString(sb, 0);
+        return sb.toString();
+    }
+
+    private void buildString(StringBuilder sb, int depth) {
+        // indent
+        for (int i = 0; i < depth; i++) {
+            sb.append("  ");
+        }
+
+        // node info
+        sb.append(type.name());
+
+        if (name != null) {
+            sb.append(" (").append(name).append(")");
+        }
+
+        if (type == ParseType.LITERAL) {
+            sb.append(" = ").append(value);
+        }
+        
+        if(type == ParseType.ARR_ASSIGN) {
+            sb.append(" " + value);
+        }
+        
+        sb.append("\n");
+
+        // recurse
+        for (ParseNode child : children) {
+            child.buildString(sb, depth + 1);
+        }
+    }
+}
+
+
+
+class Token {
+    TokenType type;
+    int value; // for numbers
+    String text; // for idents
+    int line; // for debuging
+
+    public Token(TokenType type, int value, String text) {
+        this.type = type;
+        this.value = value;
+        this.text = text;
+    }
+    
+    public Token() {}
+    
+    @Override
+    public String toString() {
+        if(type == TokenType.TOK_IDENT) {
+            return "TOK_IDENT(" + text + ")";
+        }
+        if(type == TokenType.TOK_NUMBER) {
+            return "TOK_NUMBER(" + value + ")";
+        }
+        
+        return type.name();
     }
     
 }
